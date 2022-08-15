@@ -3,6 +3,7 @@ var https = require('https');
 var url  = require ('url');
 var qs   = require ('querystring');
 var util = require ('util');
+var zlib = require('zlib');
 
 // var debug = require ('debug')('clickhouse');
 
@@ -137,6 +138,10 @@ function httpResponseHandler (stream, reqParams, reqData, cb, response) {
 
 		// one shot data parsing, should be much faster for smaller datasets
 		try {
+			if (response.headers['content-encoding'] === 'gzip') {
+				str = zlib.gunzipSync(str)
+			}
+			
 			data = JSON.parse (str.toString ('utf8'));
 
 			data.transferred = symbolsTransferred;
@@ -296,7 +301,10 @@ ClickHouse.prototype.query = function (chQuery, options, cb) {
 		// 4. Insert from SELECT: INSERT INTO t SELECT…
 
 		// we need to handle 2 and 3 and http stream must stay open in that cases
-		if (chQuery.match (/\s+VALUES\b/i)) {
+		
+		if (chQuery.match (/\s+FUNCTION\b/i)) {
+			options.format = options.dataObjects ? 'JSON' : 'JSONCompact';
+		} else if (chQuery.match (/\s+VALUES\b/i)) {
 			if (chQuery.match (/\s+VALUES\s*$/i))
 				reqData.finalized = false;
 
